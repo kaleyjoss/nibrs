@@ -1,0 +1,105 @@
+* Project: NIBRS Cleaning
+* Purpose: Creates crosswalk file of all years, months and agencies, for merging.
+* Then merge into larger combined dataset to be able to see missingness.
+* Author: Kaley
+* Date: 2026-01-07
+* Input: Combined 2018-2023 table
+* Output: 2018-2023 table with missingness
+****************************************************
+
+*-----------------------------*
+* 0. Housekeeping
+*-----------------------------*
+version 17
+clear all
+set more off
+set linesize 255
+
+
+*-----------------------------*
+* 1. Paths (EDIT)
+*-----------------------------*
+global root    "/Users/klj9278/Library/CloudStorage/Box-Box/_RELIEF_Box/_1b_National_Data/national_datasets/NIBRS"
+global raw     "$root/raw_data"
+global clean   "$root/clean_data"
+global clean_columns "$clean/1_clean_columns"
+global combined_data  "$clean/2_combined_raw"
+global added_mis  "$clean/3_added_missingness"
+
+
+*-----------------------------*
+* 1. File List (EDIT)
+*-----------------------------*
+
+local cws months.csv crosswalk_all_police_agencies.csv crosswalk_all_fips.csv
+*-----------------------------*
+* 2. Crosswalk combinations
+*-----------------------------*
+
+* Import months and save as tempfile
+import delimited "$raw/months.csv", clear varnames(1)
+tempfile months
+save `months', replace
+
+* Import years and save as tempfile
+import delimited "$raw/years.csv", clear varnames(1)
+tempfile years
+save `years', replace
+* Cross join months × years → year_months
+use `months', clear
+cross using `years'
+tempfile year_months
+save `year_months', replace
+save "$raw/year_months.dta", replace
+
+*-----------------------------*
+* 3. Crosswalk agencies
+*-----------------------------*
+
+import delimited "$raw/crosswalk_all_police_agencies.csv", clear varnames(1)
+drop state_abb //this has some "NA" variables, but we can get it from the ORI
+drop ori9 //not necessary, and has missingness
+tempfile agencies
+save `agencies', replace
+use `agencies', clear
+cross using `year_months'
+tempfile full_panel
+save `full_panel', replace
+save "$raw/agencies_year_months.dta", replace
+
+*-----------------------------*
+* 4. Drop columns with "reported no data" in zero_data_indicator, so it's missing when i merge in yr/agency/month
+*-----------------------------*
+use "$combined_data/combined_data_2018-2023.dta"
+keep if strpos(zero_data_indicator_binary, "reported no data") == 0
+
+*-----------------------------*
+* 4. Drop irrelevant or inaccurate columns
+*-----------------------------*
+
+// Same thing with the juv_ indicators, luckily we don't need those
+drop juvadult_indicators juv_handled_within_department juv_disposition_indicator juv_referred_to_crim_court juv_referred_to_juv_court juv_referred_to_police juv_referred_to_welfare 
+
+// Make fips_state_county_code merge-able in combined_data
+destring fips_state_county_code, gen(fips_state_county_code_numeric)
+tempfile combined_data 
+save `combined_data', replace
+clear
+
+// Make fips_state_county_code merge-able in crosswalk
+use "$raw/agencies_year_months.dta"
+replace fips_state_county_code="" if fips_state_county_code=="20na"
+//make new var for fips_state_county_code_crosswalk so that if they don't match up it doesn't mess anything up
+destring fips_state_county_code, gen(fips_state_county_code_crosswalk) 
+drop fips_state_county_code 
+
+*-----------------------------*
+* 5. Merge in combined file to agencies_year_months crosswalk 
+*      This is so any agency/year/month combo missing in combined_data is now a row with missing data
+*-----------------------------*
+
+merge 1:m year month ori using `combined_data'
+sort ori year month
+
+
+save "$added_mis/combined_data_with_missingness_2018-2023.dta", replace
