@@ -28,16 +28,11 @@ local filename "combined_data_with_missingness_2018-2023.dta"
 clear
 use "$added_mis/`filename'"
 
-// graph bar zero_data_months if year==2018, over(ori)
-
-
 *-----------------------------*
-* 1. Visualize by-variable missingness
+* 1. Check that 
 *-----------------------------*
 
 * List of variables to check
-// levelsof year, local(years_list)
-//
 
 bysort ori : egen missing_months_2018to23 = sum(zero_data_indicator_binary)
 
@@ -45,7 +40,6 @@ bysort ori year: gen num_months = _N // num_months is now the number of months f
 
 
 
-// preserve
 
 * Reshape into long format
 * Keep only the ORI and missing months
