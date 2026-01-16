@@ -67,10 +67,18 @@ tempfile full_panel
 save `full_panel', replace
 save "$raw/agencies_year_months.dta", replace
 
-		   *-----------------------------*
-* 5. Merge in combined file to agencies_year_months crosswalk 
-*      This is so any agency/year/month combo missing in combined_data is now a row with missing data
 *-----------------------------*
+* 4. Drop columns with "reported no data" in zero_data_indicator, so it's missing when i merge in yr/agency/month
+*-----------------------------*
+use "$combined_data/combined_data_2018-2023.dta"
+keep if zero_data_indicator_binary, ) == 0
+
+*-----------------------------*
+* 4. Drop irrelevant or inaccurate columns
+*-----------------------------*
+
+// Same thing with the juv_ indicators, luckily we don't need those
+drop juvadult_indicators juv_handled_within_department juv_disposition_indicator juv_referred_to_crim_court juv_referred_to_juv_court juv_referred_to_police juv_referred_to_welfare 
 
 // Make fips_state_county_code merge-able in combined_data
 destring fips_state_county_code, gen(fips_state_county_code_numeric)
@@ -85,6 +93,10 @@ replace fips_state_county_code="" if fips_state_county_code=="20na"
 destring fips_state_county_code, gen(fips_state_county_code_crosswalk) 
 drop fips_state_county_code 
 
+*-----------------------------*
+* 5. Merge in combined file to agencies_year_months crosswalk 
+*      This is so any agency/year/month combo missing in combined_data is now a row with missing data
+*-----------------------------*
 
 merge 1:m year month ori using `combined_data'
 sort ori year month
