@@ -68,17 +68,30 @@ save `full_panel', replace
 save "$raw/agencies_year_months.dta", replace
 
 *-----------------------------*
-* 4. Drop columns with "reported no data" in zero_data_indicator, so it's missing when i merge in yr/agency/month
+* 4. Make zero_data_indicator=1 if there are any crimes reported in all crime columns
 *-----------------------------*
 use "$combined_data/combined_data_2018-2023.dta"
-keep if zero_data_indicator_binary!=0
+local exclude ori ori9 population agency_name year month date state state_abb pop_group country_division fips_state_code fips_county_code fips_state_county_code fips_place_code agency_type crosswalk_agency_name census_name longitude latitude address_name address_street_line_1 address_street_line_2 address_city address_state address_zip_code date_of_last_update date_of_1st_previous_update date_of_2nd_previous_update covered_by number_of_months_reported monthly_header_designation breakdown_indicator age_race_ethnicity_indicator juvadult_indicators zero_data_indicator juv_disposition_indicator juv_handled_within_department juv_referred_to_juv_court juv_referred_to_welfare juv_referred_to_police juv_referred_to_crim_court zero_data_indicator_binary zero_data_months identifier_code agency_header_designation msa county sequence_number suburban core_city
+ds `exclude', not
+local crime_vars `r(varlist)'
+// egen crimes_total = rowtotal(`crime_vars')
+// replace zero_data_indicator_binary = 1 if zero_data_indicator_binary == 0 & crimes_total > 0
 
 *-----------------------------*
-* 4. Drop irrelevant or inaccurate columns
+* 4. Replace 0 with "missing" for rows with "reported no data"/zero_data_indicator_binary=0, so it shows as missing instead of a reported 0
+*-----------------------------*
+
+foreach v of local crime_vars {
+    replace `v' = . if `v' == 0 & zero_data_indicator_binary == 0
+}
+
+*-----------------------------*
+* 5. Drop irrelevant or inaccurate columns, clean for mergiong
 *-----------------------------*
 
 // Same thing with the juv_ indicators, luckily we don't need those
 drop juvadult_indicators juv_handled_within_department juv_disposition_indicator juv_referred_to_crim_court juv_referred_to_juv_court juv_referred_to_police juv_referred_to_welfare
+drop zero_data_indicator 
 
 // Make fips_state_county_code merge-able in combined_data
 destring fips_state_county_code, gen(fips_state_county_code_numeric)
@@ -94,19 +107,19 @@ destring fips_state_county_code, gen(fips_state_county_code_crosswalk)
 drop fips_state_county_code 
 
 *-----------------------------*
-* 5. Merge in combined file to agencies_year_months crosswalk 
+* 6. Merge in combined file to agencies_year_months crosswalk 
 *      This is so any agency/year/month combo missing in combined_data is now a row with missing data
 *-----------------------------*
 merge 1:m year month ori using `combined_data'
 sort ori year month
 
 *-----------------------------*
-* 6. Check that each agency/year only has 12 or less rows-- that the merging in didn't add any rows/duplicate months
+* 7. Check that each agency/year only has 12 or less rows-- that the merging in didn't add any rows/duplicate months
 *-----------------------------*
 bysort ori year : gen num_rows = _N
 
 *-----------------------------*
-* 7. Out of 1.7million rows, there are 1400 with num_months>12 (99.43% have correct number). However, if I ignore the below indicator variables, and then drop duplicates, those rows are duplicates, and there's only 12 per agency/year. So these must have been double imports. So i'm ignoring/making missing these.
+* 8. Out of 1.7million rows, there are 1294 with num_months>12 (99.43% have correct number). However, if I ignore the below indicator variables, and then drop duplicates, those rows are duplicates, and there's only 12 per agency/year. So these must have been double imports. So i'm ignoring/making missing these.
 *-----------------------------*
 replace age_race_ethnicity_indicator = "" if num_rows > 12
 replace breakdown_indicator = "" if num_rows > 12

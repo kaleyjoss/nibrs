@@ -29,34 +29,62 @@ clear
 use "$added_mis/`filename'"
 
 *-----------------------------*
-* 1. Check that 
+* 1. Variables (EDIT)
+*-----------------------------*
+local n_years = 6
+
+*-----------------------------*
+* 1. Visualize missingness for agencies/counties
 *-----------------------------*
 
-* List of variables to check
+// Count agencies with 100% missingness
+bysort ori year : egen months_of_data_each_year = sum(zero_data_indicator_binary)
+bysort ori : egen months_of_data_total = sum(zero_data_indicator_binary)
+replace months_of_data_each_year = 0 if missing(months_of_data_each_year)
+replace months_of_data_total = 0 if missing(months_of_data_total)
 
-bysort ori : egen missing_months_2018to23 = sum(zero_data_indicator_binary)
+// Filter to rows of 100%-missing agencies
+// Save list of agencies with 100% missingness 
+levelsof crosswalk_agency_name if months_of_data_total==0, local(agencies_with_zero_data)
+local num_agencies_with_zero_data : word count `agencies_with_zero_data'
+di `num_agencies_with_zero_data'
 
-bysort ori year: gen num_months = _N // num_months is now the number of months for each ORI/Year
+// Count number of agencies, zero-data-agencies for each county
+bysort fips_state_county_code_crosswalk ori: gen _tag = _n == 1
+bysort fips_state_county_code_crosswalk: egen num_agencies = total(_tag)
+drop _tag
+
+bysort fips_state_county_code_crosswalk ori: gen _tag = _n == 1 & months_of_data_total == 0
+bysort fips_state_county_code_crosswalk (months_of_data_total): egen num_agencies_with_zero_data = total(_tag)
+drop _tag
+
+
+gen has_any_data = (months_of_data_total!=0)
+gen population_any_data = has_any_data*crosswalk_population
+gen population_x_num_months = (crosswalk_population*months_of_data_each_year)/12
+gen population_x_total_months = (crosswalk_population*months_of_data_total)/(`n_years'*12)
+
+bysort fips_state_county_code_crosswalk: egen county_population = sum(crosswalk_population)
+
+keep ori crosswalk_agency_name fips_state_county_code_crosswalk county_population crosswalk_population year num_agencies num_agencies_with_zero_data months_of_data_each_year population_any_data population_x_num_months population_x_total_months
+duplicates drop
+save "$clean/missingness_by_population_agency.dta", replace
+
+bysort fips_state_county_code_crosswalk year : egen c_yr_pop_covered_any = sum(population_any_data) 
+
+gen perc_c_yr_pop_covered_any = c_yr_pop_covered_any/county_population
+
+bysort fips_state_county_code_crosswalk : egen c_pop_covered_any = sum(population_any_data)
+
+local n_years = 6
+replace c_pop_covered_any = c_pop_covered_any/`n_years'
+
+gen perc_c_pop_covered_any = c_pop_covered_any/county_population
+
+keep fips_state_county_code_crosswalk crosswalk_population year c_yr_pop_covered_any perc_c_yr_pop_covered_any c_pop_covered_any perc_c_pop_covered_any
+duplicates drop 
+gen fips_5_digit fips_state_county_code_crosswalk = string(fips_state_county_code_crosswalk, "%05.0f")
+save "$clean/missingness_by_county.dta", replace
 
 
 
-
-* Reshape into long format
-* Keep only the ORI and missing months
-// reshape long missing_months_, i(ori) j(year_missing_data)
-// save "$raw/missing_months_by_agency.dta", replace
-
-//
-//
-// bysort ori (year): gen agency_order = _n if year==2018
-// bysort ori (year): replace agency_order = agency_order[_n-1] if missing(agency_order)
-// levelsof year, local(years)
-
-//
-// foreach y of local years {
-//     graph bar zero_data_months if year==`y', over(ori, sort(0)) ///
-//         ylabel(0(1)12) ///
-//         title("Missing months per agency in `y'") ///
-//         bargap(0.5) ///
-//         xlabel(, angle(vertical))
-// }
