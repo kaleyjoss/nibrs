@@ -25,6 +25,7 @@ global clean   "$root/clean_data"
 global clean_columns "$clean/1_clean_columns"
 global combined_data  "$clean/2_combined_raw"
 global added_mis  "$clean/3_added_missingness"
+cap mkdir added_mis
 
 
 *-----------------------------*

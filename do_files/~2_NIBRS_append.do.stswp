@@ -23,7 +23,7 @@ global root    "/Users/klj9278/Library/CloudStorage/Box-Box/_RELIEF_Box/_1b_Nati
 global clean   "$root/clean_data"
 global clean_columns "$clean/1_clean_columns"
 global combined_data  "$clean/2_combined_raw"
-cap mkdir combined_data
+cap mkdir 
 
 *-----------------------------*
 * 1. File List (EDIT)
