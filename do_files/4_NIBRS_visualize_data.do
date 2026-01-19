@@ -32,53 +32,74 @@ cap mkdir vis_mis
 * 1. Variables (EDIT)
 *-----------------------------*
 local n_years = 6
+local missingness_cutoff = 0.5 // States must report > this percentage of months over the years, unless will be counted as 'missing'
 
 *-----------------------------*
 * 1. Visualize missingness for agencies/counties
 *-----------------------------*
 
-// Count agencies with 100% missingness
+// Sum up months of data each year, totla
 bysort ori year : egen months_of_data_each_year = sum(zero_data_indicator_binary)
 bysort ori : egen months_of_data_total = sum(zero_data_indicator_binary)
+
+
+// Create binary indicators for marking agencies as 'missing', using either method, from months of data reported each year
+gen missing_any = months_of_data_total == 0
+gen missing_cutoff = months_of_data_total <= `n_years'*12*`missingness_cutoff'
+gen reporting_any = !missing_any
+gen reporting_cutoff = !missing_cutoff
+
 
 // Save list of agencies with 100% missingness 
 levelsof crosswalk_agency_name if months_of_data_total==0, local(agencies_with_zero_data)
 local num_total_agencies_zero_data : word count `agencies_with_zero_data'
 
-// Count number of agencies, zero-data-agencies for each county
-bysort ori: gen _tag = _n == 1 // tag first instance of each ori 
-bysort fips_state_county_code_crosswalk: egen num_agencies = total(_tag) // number oris
-drop _tag
+// Tag first instance of each ORI
+bysort ori: gen _tag = _n == 1 
 
-bysort fips_state_county_code_crosswalk ori: gen _tag = _n == 1 & months_of_data_total == 0 // tag first instance of each ori with 0 data
-bysort fips_state_county_code_crosswalk (months_of_data_total): egen num_agencies_zero_data = total(_tag) // number oris with 0 data
-drop _tag
+// Count number of agencies per county
+bysort fips_state_county_code_crosswalk: egen num_agencies = total(_tag) // number of ORIs
 
+// Number of missing agencies per county
+// Strict, only missing if it's never reported data
+bysort fips_state_county_code_crosswalk: egen num_missing_any = total(_tag * missing_any)
+// Cutoff, only missing if it's reported less than missingness_cutoff of months in last 6 years
+bysort fips_state_county_code_crosswalk: egen num_missing_cutoff = total(_tag * missing_cutoff)
 
-gen has_any_data = (months_of_data_total!=0) //binary indicator
-gen population_any_data = has_any_data*crosswalk_population 
-gen population_x_num_months = (crosswalk_population*months_of_data_each_year)/12
-gen population_x_total_months = (crosswalk_population*months_of_data_total)/(`n_years'*12)
+// Number of reporting agencies
+gen num_reporting_any = num_agencies - num_missing_any
+gen num_reporting_cutoff = num_agencies - num_missing_cutoff
 
-bysort fips_state_county_code_crosswalk: egen county_population = sum(crosswalk_population)
+// Percentages of reporting vs. missing agencies
+gen pct_missing_any = num_missing_any / num_agencies
+gen pct_reporting_any = num_reporting_any / num_agencies
+gen pct_missing_cutoff = num_missing_cutoff / num_agencies
+gen pct_reporting_cutoff = num_reporting_cutoff / num_agencies
 
-keep ori crosswalk_agency_name fips_state_county_code_crosswalk county_population crosswalk_population year num_agencies num_agencies_zero_data months_of_data_each_year population_any_data population_x_num_months population_x_total_months
+//  Sum population of missing agencies (strict)
+bysort fips_state_county_code_crosswalk: egen pop_missing_any = total(crosswalk_population * missing_any)
+bysort fips_state_county_code_crosswalk: egen pop_reporting_any = total(crosswalk_population * reporting_any)
+
+// Sum population of missing agencies (60% cutoff)
+bysort fips_state_county_code_crosswalk: egen pop_missing_cutoff = total(crosswalk_population * missing_cutoff)
+bysort fips_state_county_code_crosswalk: egen pop_reporting_cutoff = total(crosswalk_population * reporting_cutoff)
+
+// Percent of county population missing/reporting
+bysort fips_state_county_code_crosswalk: egen county_population = total(crosswalk_population*_tag)
+
+gen pct_pop_missing_any = pop_missing_any / county_population
+gen pct_pop_reporting_any = pop_reporting_any / county_population
+
+gen pct_pop_missing_cutoff = pop_missing_cutoff / county_population
+gen pct_pop_reporting_cutoff = pop_reporting_cutoff / county_population
+
+keep fips_state_county_code_crosswalk num_agencies num_missing_any num_missing_cutoff num_reporting_any num_reporting_cutoff pct_missing_any pct_missing_cutoff pct_reporting_any pct_reporting_cutoff pop_missing_any pop_missing_cutoff pop_reporting_any pop_reporting_cutoff county_population pct_pop_missing_any pct_pop_reporting_any pct_pop_missing_cutoff pct_pop_reporting_cutoff
+
 duplicates drop
-save "$vis_mis/missingness_by_population_agency.dta", replace
 
-bysort fips_state_county_code_crosswalk year : egen c_yr_pop_covered_any = sum(population_any_data) 
-
-gen perc_c_yr_pop_covered_any = c_yr_pop_covered_any/county_population
-
-bysort fips_state_county_code_crosswalk : egen c_pop_covered_any = sum(population_any_data)
-
-replace c_pop_covered_any = c_pop_covered_any/`n_years'
-
-gen perc_c_pop_covered_any = c_pop_covered_any/county_population
-
-keep fips_state_county_code_crosswalk year c_yr_pop_covered_any perc_c_yr_pop_covered_any c_pop_covered_any perc_c_pop_covered_any
-duplicates drop 
 gen fips_5_digit = string(fips_state_county_code_crosswalk, "%05.0f")
-save "$vis_mis/missingness_by_county.dta", replace
-export delimited using "missingness_by_county.csv", replace
 
+tempfile missingness_by_county
+save `missingness_by_county', replace
+save "$vis_mis/missingness_by_county.dta", replace
+export delimited using "$vis_mis/missingness_by_county.csv", replace

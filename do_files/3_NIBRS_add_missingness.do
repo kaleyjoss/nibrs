@@ -113,6 +113,8 @@ drop fips_state_county_code
 *-----------------------------*
 merge 1:m year month ori using `combined_data'
 sort ori year month
+tab _merge
+drop _merge
 
 *-----------------------------*
 * 7. Check that each agency/year only has 12 or less rows-- that the merging in didn't add any rows/duplicate months
