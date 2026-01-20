@@ -1,6 +1,6 @@
 ****************************************************
 * Project: NIBRS Cleaning
-* Purpose: Loads in each SRS NIBRS data from 2018-2023, downloaded from https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/KFMHQE 
+* Purpose: Appends together the SRS data from 2
 * Author: Kaley
 * Date: 2026-01-07
 * Input: Column-cleaned 2018-2023 files
@@ -23,7 +23,7 @@ global root    "/Users/klj9278/Library/CloudStorage/Box-Box/_RELIEF_Box/_1b_Nati
 global clean   "$root/clean_data"
 global clean_columns "$clean/1_clean_columns"
 global combined_data  "$clean/2_combined_raw"
-cap mkdir 
+cap mkdir combined_data
 
 *-----------------------------*
 * 1. File List (EDIT)

@@ -1,6 +1,6 @@
 ****************************************************
 * Project: NIBRS Cleaning
-* Purpose: Loads in each SRS NIBRS data from 2018-2023, downloaded from https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/KFMHQE 
+* Purpose: Appends together the SRS data from 2018-2023
 * Author: Kaley
 * Date: 2026-01-07
 * Input: Column-cleaned 2018-2023 files

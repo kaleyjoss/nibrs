@@ -32,18 +32,19 @@ cap mkdir vis_mis
 * 1. Variables (EDIT)
 *-----------------------------*
 local n_years = 6
-local missingness_cutoff = 0.5 // States must report > this percentage of months over the years, unless will be counted as 'missing'
+local missingness_cutoff = 0.6 // States must report > this percentage of months over the years, unless will be counted as 'missing'
 
 *-----------------------------*
 * 1. Visualize missingness for agencies/counties
 *-----------------------------*
 
-// Sum up months of data each year, totla
+// Sum up months of data each year, total
 bysort ori year : egen months_of_data_each_year = sum(zero_data_indicator_binary)
 bysort ori : egen months_of_data_total = sum(zero_data_indicator_binary)
 
 
 // Create binary indicators for marking agencies as 'missing', using either method, from months of data reported each year
+gen cutoff `missingness_cutoff'
 gen missing_any = months_of_data_total == 0
 gen missing_cutoff = months_of_data_total <= `n_years'*12*`missingness_cutoff'
 gen reporting_any = !missing_any
@@ -77,15 +78,15 @@ gen pct_missing_cutoff = num_missing_cutoff / num_agencies
 gen pct_reporting_cutoff = num_reporting_cutoff / num_agencies
 
 //  Sum population of missing agencies (strict)
-bysort fips_state_county_code_crosswalk: egen pop_missing_any = total(crosswalk_population * missing_any)
-bysort fips_state_county_code_crosswalk: egen pop_reporting_any = total(crosswalk_population * reporting_any)
+bysort fips_state_county_code_crosswalk: egen pop_missing_any = total(crosswalk_population * missing_any * _tag)
+bysort fips_state_county_code_crosswalk: egen pop_reporting_any = total(crosswalk_population * reporting_any * _tag)
 
 // Sum population of missing agencies (60% cutoff)
-bysort fips_state_county_code_crosswalk: egen pop_missing_cutoff = total(crosswalk_population * missing_cutoff)
-bysort fips_state_county_code_crosswalk: egen pop_reporting_cutoff = total(crosswalk_population * reporting_cutoff)
+bysort fips_state_county_code_crosswalk: egen pop_missing_cutoff = total(crosswalk_population * missing_cutoff * _tag)
+bysort fips_state_county_code_crosswalk: egen pop_reporting_cutoff = total(crosswalk_population * reporting_cutoff * _tag)
 
 // Percent of county population missing/reporting
-bysort fips_state_county_code_crosswalk: egen county_population = total(crosswalk_population*_tag)
+bysort fips_state_county_code_crosswalk: egen county_population = total(crosswalk_population*  _tag)
 
 gen pct_pop_missing_any = pop_missing_any / county_population
 gen pct_pop_reporting_any = pop_reporting_any / county_population
@@ -102,4 +103,4 @@ gen fips_5_digit = string(fips_state_county_code_crosswalk, "%05.0f")
 tempfile missingness_by_county
 save `missingness_by_county', replace
 save "$vis_mis/missingness_by_county.dta", replace
-export delimited using "$vis_mis/missingness_by_county.csv", replace
+export delimited using "$vis_mis/missingness_by_county_cutoff`missingness_cutoff'.csv", replace
