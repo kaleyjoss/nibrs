@@ -1,6 +1,6 @@
 ****************************************************
 * Project: NIBRS Cleaning
-* Purpose: Visualize the combined and added-missingness data 
+* Purpose: Analyze the data for missingness
 * Author: Kaley
 * Date: 2026-01-07
 ****************************************************
@@ -17,23 +17,34 @@ set linesize 255
 *-----------------------------*
 * 1. Paths (EDIT)
 *-----------------------------*
+
+local filename "combined_data_with_missingness_2018-2023.dta"  
+
 global root    "/Users/klj9278/Library/CloudStorage/Box-Box/_RELIEF_Box/_1b_National_Data/national_datasets/NIBRS"
+
 global raw     "$root/raw_data"
 global clean   "$root/clean_data"
 global clean_columns "$clean/1_clean_columns"
 global combined_data  "$clean/2_combined_raw"
 global added_mis  "$clean/3_added_missingness"
-local filename "combined_data_with_missingness_2018-2023.dta" 
 use "$added_mis/`filename'"
 
 global vis_mis "$clean/4_visualize_missingness"
-cap mkdir vis_mis
+cap mkdir `vis_mis'
 *-----------------------------*
 * 1. Variables (EDIT)
 *-----------------------------*
 local n_years = 6
-local missingness_cutoff = 0.6 // States must report > this percentage of months over the years, unless will be counted as 'missing'
+local missingness_cutoff = 0.8 // States must report > this percentage of months over the years, unless will be counted as 'missing'
 
+// if you want to specify by year, modify these:
+local single_year = 1 // 1 = true, 0 = false
+local year_to_keep = 2019
+
+if `single_year' {
+	keep if year == `year_to_keep'
+	local n_years = 1
+}
 *-----------------------------*
 * 1. Visualize missingness for agencies/counties
 *-----------------------------*
@@ -100,5 +111,14 @@ duplicates drop
 
 tempfile missingness_by_county
 save `missingness_by_county', replace
-save "$vis_mis/missingness_by_county.dta", replace
-export delimited using "$vis_mis/missingness_by_county_cutoff`missingness_cutoff'.csv", replace
+
+if `single_year' {
+    save "$vis_mis/missingness_by_county_`year_to_keep'.dta", replace
+    export delimited using ///
+        "$vis_mis/missingness_by_county_cutoff`missingness_cutoff'_`year_to_keep'.csv", replace
+}
+else {
+    save "$vis_mis/missingness_by_county.dta", replace
+    export delimited using ///
+        "$vis_mis/missingness_by_county_cutoff`missingness_cutoff'.csv", replace
+}
